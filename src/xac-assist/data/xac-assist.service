@@ -1,0 +1,14 @@
+[Unit]
+Description=XaC Assist
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/xac-assist
+ExecStart=/opt/xac-assist/xac-assist
+SyslogIdentifier=xac-assist
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
