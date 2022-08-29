@@ -1,3 +1,5 @@
+using Nfw.Linux.Joystick.Smart;
+
 namespace XacAssist {    
     public class XacAssistWorker : BackgroundService
     {
@@ -20,15 +22,34 @@ namespace XacAssist {
 
                 string readDevice = _configuration["Devices:Input"] ?? "/dev/input/js0";
                 string writeDevice = _configuration["Devices:Output"] ?? "/dev/hidg0";
-                _logger.LogInformation($"Reading from {readDevice} and outputting to {writeDevice}");
+                _logger.LogInformation($"Piping {readDevice} => {writeDevice}");
 
-                while (!stoppingToken.IsCancellationRequested && !_internalStopToken.Token.IsCancellationRequested)
-                {                                           
-                    await Task.Delay(1000, stoppingToken);
-                }            
+                using(Joystick joystick = new Joystick(readDevice, ButtonEventTypes.All)) {
+
+                    joystick.DefaultButtonSettings = new ButtonSettings() { 
+                        LongPressMinimumDurationMilliseconds = 500
+                    };
+
+                    joystick.ButtonCallback = (j, button, eventType, pressed, elapsedTime) => {
+                        _logger.LogDebug($"{j.DeviceName} => Button[{button}] => {eventType} [Current: {pressed} Elapsed: {elapsedTime}]");
+                    };
+
+                    joystick.AxisCallback = (j, axis, value, elapsedTime) => {
+                        _logger.LogDebug($"{j.DeviceName} => Axis[{axis}] => {value} [Elapsed: {elapsedTime}]");
+                    };
+
+                    joystick.ConnectedCallback = (j, c) => {
+                        _logger.LogDebug($"{j.DeviceName} => Connected[{c}]");
+                    };                                  
+
+                    while (!stoppingToken.IsCancellationRequested && !_internalStopToken.Token.IsCancellationRequested)
+                    {                                           
+                        await Task.Delay(1000, stoppingToken);
+                    }            
                             
-                _logger.LogInformation("ExecuteAsync() signaled to stop");                
-                _shutdownComplete.Cancel();     
+                    _logger.LogInformation("ExecuteAsync() signaled to stop");
+                    _shutdownComplete.Cancel();
+                }
             }
         }
 
