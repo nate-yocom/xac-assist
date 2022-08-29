@@ -7,6 +7,7 @@ OUTPUT ?= $(BIN)/$(TARGET)/
 ARCH ?= arm
 OS ?= linux
 PUSH_PORT ?= 22
+CONFIGURATION ?= Debug
 
 all: build
 
@@ -14,13 +15,14 @@ clean:
 	rm -rf $(BIN)	
 	dotnet clean
 
-build: 
-	mkdir -p $(OUTPUT)
-	mkdir -p $(OUTPUT)/data
-	dotnet publish --self-contained -p:PublishSingleFile=true --output $(OUTPUT) --arch $(ARCH) --os $(OS)	
-	cp -f data/* $(OUTPUT)/data/
+build: 	
+	dotnet build --self-contained -p:PublishSingleFile=true --arch $(ARCH) --os $(OS) --configuration $(CONFIGURATION)		
 
-push: build
+publish: build
+	mkdir -p $(OUTPUT)
+	dotnet publish --self-contained -p:PublishSingleFile=true --output $(OUTPUT) --arch $(ARCH) --os $(OS) --configuration $(CONFIGURATION)
+
+push: publish
 	rsync -a -e "ssh -p ${PUSH_PORT}" $(OUTPUT) ${PUSH_USER}@${PUSH_HOST}:/opt/xac-assist
 
 install:
