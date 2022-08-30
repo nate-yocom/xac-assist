@@ -21,7 +21,8 @@ namespace XacAssist {
         private object _mutex = new object();
         private ushort _buttonState = 0x0000;
         private byte[] _buffer = new byte[11];
-        
+        private Dictionary<byte, byte> _buttonMapping = new Dictionary<byte, byte>();
+        private HashSet<byte> _ignoreButtons = new HashSet<byte>();
         
         public XacAssistWorker(ILogger<XacAssistWorker> logger, IServiceScopeFactory scopeFactory, IConfiguration configuration) {
             _logger = logger;
@@ -42,11 +43,16 @@ namespace XacAssist {
                 int waitToReset = int.Parse(_configuration["Options:WaitToResetMs"] ?? "10");
                 float fireThreshold = float.Parse(_configuration["Options:FireThreshold"] ?? DEFAULT_FIRE_THRESHOLD.ToString());
                 float resetThreshold = float.Parse(_configuration["Options:ResetThreshold"] ?? DEFAULT_RESET_THRESHOLD.ToString());
-                string buttonMap = _configuration["Options:ButtonMap"] ?? "";
+                string buttonMap = _configuration["Options:ButtonMap"] ?? "1=4,0=5";
+                string ignoreButtons = _configuration["Options:IgnoreButtons"] ?? "";
                 
                 _logger.LogInformation($"Piping {readDevice} => {writeDevice}");
                 _logger.LogInformation($"FireAndReset => {fireAndReset} WaitToReset => {waitToReset}");
                 _logger.LogInformation($"FireThreshold => {fireThreshold} ResetThreshold => {resetThreshold}");
+                _logger.LogInformation($"ButtonMap: {buttonMap}");
+                _logger.LogInformation($"IgnoreButtons: {ignoreButtons}");
+                ParseButtonMapOption(buttonMap);
+                ParseButtonIgnoreOption(ignoreButtons);
 
                 using(Joystick joystick = new Joystick(readDevice, ButtonEventTypes.Press | ButtonEventTypes.Release)) {
 
@@ -56,10 +62,12 @@ namespace XacAssist {
 
                     joystick.ButtonCallback = (j, button, eventType, pressed, elapsedTime) => {
                         lock(_mutex) {
-                            _logger.LogDebug($"Button {button} {eventType} [{elapsedTime}]");
-                            /*if(button == 0) button = 4; // trigger => A
-                            if(button == 1) button = 5; // side => B*/
-                            UpdateButton(writeDevice, button, eventType == ButtonEventTypes.Press);
+                            byte actualButton = MapButton(button);
+                            _logger.LogDebug($"Button {button} {eventType} => Maps to {actualButton} Ignored => {_ignoreButtons.Contains(button)} [{elapsedTime}]");
+
+                            if (!_ignoreButtons.Contains(button)) {
+                                UpdateButton(writeDevice, actualButton, eventType == ButtonEventTypes.Press);
+                            }
                         }
                     };
 
@@ -103,6 +111,33 @@ namespace XacAssist {
                     _shutdownComplete.Cancel();
                 }
             }
+        }
+
+        private void ParseButtonMapOption(string mapString) {
+            if (string.IsNullOrWhiteSpace(mapString))
+                return;
+            
+            // A=B,C=D
+            string[] maps = mapString.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            foreach(string map in maps) {
+                string[] bits = map.Split('=', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                _buttonMapping[byte.Parse(bits[0])] = byte.Parse(bits[1]);
+            }
+        }
+
+        private void ParseButtonIgnoreOption(string buttonString) {
+            if (string.IsNullOrWhiteSpace(buttonString))
+                return;
+            
+            // 0,5,6
+            string[] buttons = buttonString.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            foreach(string button in buttons) {
+                _ignoreButtons.Add(byte.Parse(button));
+            }
+        }
+
+        private byte MapButton(byte inputButton) {
+            return _buttonMapping.ContainsKey(inputButton) ? _buttonMapping[inputButton] : inputButton;
         }
         
         private bool IsCurrentlyFired(byte axis) {
