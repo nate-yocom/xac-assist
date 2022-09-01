@@ -96,7 +96,6 @@ echo 30 > "${USB_CONFIG_DIR}/MaxPower"
 
 CONFIGS_STRINGS_DIR="${USB_CONFIG_DIR}/${USB_STRINGS_DIR}"
 mkdir -p "${CONFIGS_STRINGS_DIR}"
-echo "Config ${USB_CONFIG_INDEX}: ECM network" > "${CONFIGS_STRINGS_DIR}/configuration"
 
 ln -s "${USB_JOYSTICK_FUNCTIONS_DIR}" "${USB_CONFIG_DIR}/"
 
