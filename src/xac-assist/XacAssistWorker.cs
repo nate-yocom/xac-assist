@@ -1,4 +1,5 @@
 using Nfw.Linux.Joystick.Smart;
+using Nfw.Linux.Hid.Joystick;
 
 namespace XacAssist {    
     public class XacAssistWorker : BackgroundService
@@ -7,8 +8,6 @@ namespace XacAssist {
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IConfiguration _configuration;
 
-        private const int OUTPUT_AXIS_MIN = -127;
-        private const int OUTPUT_AXIS_MAX = 127;
         private const float INPUT_AXIS_MIN = -32768;
         private const float INPUT_AXIS_MAX = 32768;
 
@@ -19,8 +18,6 @@ namespace XacAssist {
 
         private Dictionary<byte, bool> _currentlyFiredAxis = new Dictionary<byte, bool>();        
         private object _mutex = new object();
-        private ushort _buttonState = 0x0000;
-        private byte[] _buffer = new byte[11];
         private Dictionary<byte, byte> _buttonMapping = new Dictionary<byte, byte>();
         private HashSet<byte> _ignoreButtons = new HashSet<byte>();
         
@@ -55,7 +52,7 @@ namespace XacAssist {
                 ParseButtonIgnoreOption(ignoreButtons);
 
                 using(Joystick joystick = new Joystick(readDevice, ButtonEventTypes.Press | ButtonEventTypes.Release)) {
-
+                    SimpleJoystick outputJoystick = new SimpleJoystick(writeDevice);
                     joystick.DefaultButtonSettings = new ButtonSettings() { 
                         LongPressMinimumDurationMilliseconds = 500
                     };
@@ -66,7 +63,7 @@ namespace XacAssist {
                             _logger.LogDebug($"Button {button} {eventType} => Maps to {actualButton} Ignored => {_ignoreButtons.Contains(button)} [{elapsedTime}]");
 
                             if (!_ignoreButtons.Contains(button)) {
-                                UpdateButton(writeDevice, actualButton, eventType == ButtonEventTypes.Press);
+                                outputJoystick.UpdateButton(actualButton, eventType == ButtonEventTypes.Press);
                             }
                         }
                     };
@@ -74,22 +71,22 @@ namespace XacAssist {
                     joystick.AxisCallback = (j, axis, value, elapsedTime) => {
                         lock(_mutex) {
                             if (axis != 0 && axis != 1) {
-                                UpdateAxis(writeDevice, axis, ScaleAxisValue(value));                            
+                                outputJoystick.UpdateAxis(axis, ScaleAxisValue(value));
                             } else {                            
                                 float currentValuePercentage = Math.Abs(value) / INPUT_AXIS_MAX;
                                 if (IsCurrentlyFired(axis) && currentValuePercentage <= resetThreshold) {
-                                    if (!fireAndReset) {                                        
-                                        UpdateAxis(writeDevice, axis, RESET_VALUE);
+                                    if (!fireAndReset) {
+                                        outputJoystick.UpdateAxis(axis, RESET_VALUE);
                                     }
                                     _logger.LogDebug($"Hit {axis} RESET at value: {value} [{currentValuePercentage * 100.0f}%]");
                                     SetCurrentlyFired(axis, false);
                                 } else if (!IsCurrentlyFired(axis) && currentValuePercentage >= fireThreshold) {
                                     _logger.LogDebug($"Axis {axis} FIRE at value: {value} [{currentValuePercentage * 100.0f}%]");
-                                    UpdateAxis(writeDevice, axis, value < 0 ? (sbyte) OUTPUT_AXIS_MIN : (sbyte) OUTPUT_AXIS_MAX);
+                                    outputJoystick.UpdateAxis(axis, value < 0 ? SimpleJoystick.MIN_AXIS_VALUE : SimpleJoystick.MAX_AXIS_VALUE);
                                     if (fireAndReset) {                                        
                                         Thread.Sleep(waitToReset);
                                         _logger.LogDebug($"Axis {axis} auto-RESET after FIRING");
-                                        UpdateAxis(writeDevice, axis, RESET_VALUE);
+                                        outputJoystick.UpdateAxis(axis, RESET_VALUE);
                                     }
                                     SetCurrentlyFired(axis, true);
                                 } else {
@@ -161,40 +158,14 @@ namespace XacAssist {
             sbyte result = 0;
             if (inputValue != 0) {            
                 float percentOfMax = Math.Abs(inputValue) / INPUT_AXIS_MAX;
-                int newValue = (int) (percentOfMax * (float) (OUTPUT_AXIS_MAX + 1));            
+                int newValue = (int) (percentOfMax * (float) (SimpleJoystick.MAX_AXIS_VALUE + 1));
                 if (inputValue < 0) newValue *= -1;
-                newValue = Math.Clamp(newValue, OUTPUT_AXIS_MIN, OUTPUT_AXIS_MAX);
+                newValue = Math.Clamp(newValue, SimpleJoystick.MIN_AXIS_VALUE, SimpleJoystick.MAX_AXIS_VALUE);
                 
                 result = (sbyte) newValue;
             }
             _logger.LogTrace($"Scaled {inputValue} => {result}");
             return result;
-        }
-
-        private void FireBuffer(string outDevice) {
-            try {
-                using (BinaryWriter writer = new BinaryWriter(File.OpenWrite(outDevice))) {
-                    writer.Write(_buffer, 0, _buffer.Length);
-                    writer.Flush();
-                }
-            } catch(Exception ex) {
-                _logger?.LogWarning($"Exception while writing buffer [{Convert.ToHexString(_buffer)}]: {ex}");
-            }
-        }
-
-        private void UpdateAxis(string outDevice, byte axis, sbyte value) {            
-            _buffer[2 + axis] = (byte) value;
-            FireBuffer(outDevice);
-        }
-
-        private void UpdateButton(string outDevice, byte button, bool pressed) {            
-            if (pressed) {
-                _buttonState |= (ushort) (0x01 << button);
-            } else {
-                _buttonState &= (ushort) (~(0x01 << button));
-            }                  
-            BitConverter.TryWriteBytes(_buffer, _buttonState);                              
-            FireBuffer(outDevice);                        
         }
 
         public override async Task StopAsync(CancellationToken cancellationToken) {
