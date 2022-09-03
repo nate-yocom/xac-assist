@@ -42,6 +42,7 @@ namespace XacAssist {
                 float resetThreshold = float.Parse(_configuration["Options:ResetThreshold"] ?? DEFAULT_RESET_THRESHOLD.ToString());
                 string buttonMap = _configuration["Options:ButtonMap"] ?? "1=4,0=5";
                 string ignoreButtons = _configuration["Options:IgnoreButtons"] ?? "";
+                bool ignoreAllButtons = bool.Parse(_configuration["Options:IgnoreAllButtons"] ?? "True");
                 
                 _logger.LogInformation($"Piping {readDevice} => {writeDevice}");
                 _logger.LogInformation($"FireAndReset => {fireAndReset} WaitToReset => {waitToReset}");
@@ -60,9 +61,9 @@ namespace XacAssist {
                     joystick.ButtonCallback = (j, button, eventType, pressed, elapsedTime) => {
                         lock(_mutex) {
                             byte actualButton = MapButton(button);
-                            _logger.LogDebug($"Button {button} {eventType} => Maps to {actualButton} Ignored => {_ignoreButtons.Contains(button)} [{elapsedTime}]");
+                            _logger.LogDebug($"Button {button} {eventType} => Maps to {actualButton} Ignored => {_ignoreButtons.Contains(button) || ignoreAllButtons} [{elapsedTime}]");
 
-                            if (!_ignoreButtons.Contains(button)) {
+                            if (!ignoreAllButtons && !_ignoreButtons.Contains(button)) {
                                 outputJoystick.UpdateButton(actualButton, eventType == ButtonEventTypes.Press);
                             }
                         }
