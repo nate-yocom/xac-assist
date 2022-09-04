@@ -20,6 +20,7 @@ namespace XacAssist {
         private object _mutex = new object();
         private Dictionary<byte, byte> _buttonMapping = new Dictionary<byte, byte>();
         private HashSet<byte> _ignoreButtons = new HashSet<byte>();
+        private HashSet<byte> _ignoreAxis = new HashSet<byte>();
         
         public XacAssistWorker(ILogger<XacAssistWorker> logger, IServiceScopeFactory scopeFactory, IConfiguration configuration) {
             _logger = logger;
@@ -42,6 +43,7 @@ namespace XacAssist {
                 float resetThreshold = float.Parse(_configuration["Options:ResetThreshold"] ?? DEFAULT_RESET_THRESHOLD.ToString());
                 string buttonMap = _configuration["Options:ButtonMap"] ?? "1=4,0=5";
                 string ignoreButtons = _configuration["Options:IgnoreButtons"] ?? "";
+                string ignoreAxis = _configuration["Options:IgnoreAxis"] ?? "";
                 bool ignoreAllButtons = bool.Parse(_configuration["Options:IgnoreAllButtons"] ?? "True");
                 
                 _logger.LogInformation($"Piping {readDevice} => {writeDevice}");
@@ -49,8 +51,12 @@ namespace XacAssist {
                 _logger.LogInformation($"FireThreshold => {fireThreshold} ResetThreshold => {resetThreshold}");
                 _logger.LogInformation($"ButtonMap: {buttonMap}");
                 _logger.LogInformation($"IgnoreButtons: {ignoreButtons}");
+                _logger.LogInformation($"IgnoreAllButtons: {ignoreAllButtons}");
+                _logger.LogInformation($"IgnoreAxis: {ignoreAxis}");
+
                 ParseButtonMapOption(buttonMap);
                 ParseButtonIgnoreOption(ignoreButtons);
+                ParseAxisIgnoreOption(ignoreAxis);
 
                 using(Joystick joystick = new Joystick(readDevice, ButtonEventTypes.Press | ButtonEventTypes.Release)) {
                     SimpleJoystick outputJoystick = new SimpleJoystick(writeDevice);
@@ -71,6 +77,11 @@ namespace XacAssist {
 
                     joystick.AxisCallback = (j, axis, value, elapsedTime) => {
                         lock(_mutex) {
+
+                            if (_ignoreAxis.Contains(axis)) {
+                                return;
+                            }
+
                             if (axis != 0 && axis != 1) {
                                 outputJoystick.UpdateAxis(axis, ScaleAxisValue(value));
                             } else {                            
@@ -126,11 +137,22 @@ namespace XacAssist {
         private void ParseButtonIgnoreOption(string buttonString) {
             if (string.IsNullOrWhiteSpace(buttonString))
                 return;
-            
+
             // 0,5,6
             string[] buttons = buttonString.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             foreach(string button in buttons) {
                 _ignoreButtons.Add(byte.Parse(button));
+            }
+        }
+
+        private void ParseAxisIgnoreOption(string axisString) {
+            if (string.IsNullOrWhiteSpace(axisString))
+                return;
+
+            // 0,5,6
+            string[] axises = axisString.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            foreach(string axis in axises) {
+                _ignoreAxis.Add(byte.Parse(axis));
             }
         }
 
