@@ -38,7 +38,7 @@ namespace XacAssist {
                 
             while (!stoppingToken.IsCancellationRequested && !_internalStopToken.Token.IsCancellationRequested) {
                 await Task.Delay(1000, stoppingToken);
-            
+            }
 
             _pipeline.Stop();
 
