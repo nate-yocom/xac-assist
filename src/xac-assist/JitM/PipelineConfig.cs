@@ -11,6 +11,7 @@ namespace XacAssist.JitM {
         public HashSet<byte> IgnoredButtons { get; set; } = new HashSet<byte>();
         public HashSet<byte> IgnoredAxes { get; set; } = new HashSet<byte>();                
         public Dictionary<byte, byte> MappedButtons { get; set; } = new Dictionary<byte, byte>();
+        public Dictionary<byte, byte> MappedAxes { get; set; } = new Dictionary<byte, byte>();
 
 
         private readonly ILogger _logger;
@@ -22,6 +23,10 @@ namespace XacAssist.JitM {
 
         public byte MapButtonIfMapped(byte inputButton) {
             return MappedButtons.ContainsKey(inputButton) ? MappedButtons[inputButton] : inputButton;
+        }
+
+        public byte MapAxisIfMapped(byte inputAxis) {
+            return MappedAxes.ContainsKey(inputAxis) ? MappedAxes[inputAxis] : inputAxis;
         }
 
         public bool IsIgnoreButton(byte inputButton) {

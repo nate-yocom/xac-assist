@@ -11,8 +11,10 @@ namespace XacAssist.JitM {
         HashSet<byte> IgnoredButtons { get; set; }
         HashSet<byte> IgnoredAxes { get; set; }        
         Dictionary<byte, byte> MappedButtons { get; set; }
+        Dictionary<byte, byte> MappedAxes { get; set; }
 
         byte MapButtonIfMapped(byte inputButton);
+        byte MapAxisIfMapped(byte inputAxis);
         bool IsIgnoreButton(byte inputButton);
         bool IsIgnoreAxis(byte inputAxis);
 
