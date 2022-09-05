@@ -15,5 +15,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />    
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="controller_settings.json" Publish="true" />    
+  </ItemGroup>
     
 </Project>

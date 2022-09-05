@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace XacAssist.JitM {
     public class PipelineConfig : IPipelineConfig {
         public string InputDevice { get; set; } = "/dev/input/js0";
@@ -14,11 +17,21 @@ namespace XacAssist.JitM {
         public Dictionary<byte, byte> MappedAxes { get; set; } = new Dictionary<byte, byte>();
 
 
-        private readonly ILogger _logger;
-        private readonly IConfiguration _configuration;
+        private const string DEFAULT_SETTINGS_FILE = "controller_settings.json";
+        private JsonSerializerOptions _jsonOptions = new JsonSerializerOptions() {
+            PropertyNameCaseInsensitive = true,
+            WriteIndented = true
+        };
+
+        private ILogger? _logger;
+        private IConfiguration? _configuration;
+        
         public PipelineConfig(ILogger<PipelineConfig> logger, IConfiguration configuration) {
             _logger = logger;
             _configuration = configuration;
+        }
+
+        public PipelineConfig() {            
         }
 
         public byte MapButtonIfMapped(byte inputButton) {
@@ -38,32 +51,56 @@ namespace XacAssist.JitM {
         }
 
         public void ReadConfiguration() {
-            InputDevice = _configuration.GetValue<string>("Devices:Input", InputDevice);
-            OutputDevice = _configuration.GetValue<string>("Devices:Output", OutputDevice);            
-            WaitToReset = _configuration.GetValue<int>("Options:WaitToResetMs", WaitToReset);
-            FireThreshold = _configuration.GetValue<float>("Options:FireThreshold", FireThreshold);
-            ResetThreshold = _configuration.GetValue<float>("Options:ResetThreshold", ResetThreshold);
-            IgnoreAllButtons = _configuration.GetValue<bool>("Options:IgnoreAllButtons", IgnoreAllButtons);
-            IgnoreAllAxes = _configuration.GetValue<bool>("Options:IgnoreAllAxes", IgnoreAllAxes);
-                        
-            FireAndResetAxes = ParseList(_configuration.GetValue<string>("Options:FireAndResetAxes", "0,1"));
-            IgnoredButtons = ParseList(_configuration.GetValue<string>("Options:IgnoreButtons", ""));
-            IgnoredAxes = ParseList(_configuration.GetValue<string>("Options:IgnoreAxes", ""));
-            
-            MappedButtons = ParseMap(_configuration.GetValue<string>("Options:ButtonMap", ""));
-            LogConfiguration();
+            string configFile = _configuration.GetValue<string>("Options:ControllerSettingsFile", DEFAULT_SETTINGS_FILE);
+            if (File.Exists(configFile)) {
+                FromJSON(File.ReadAllText(configFile));
+            }            
+        }
+
+        public void FromJSON(string jsonString) {
+            PipelineConfig? newConfig = JsonSerializer.Deserialize<PipelineConfig>(jsonString, _jsonOptions);
+
+            if (newConfig != null) {
+                newConfig._logger = _logger;
+                newConfig._configuration = _configuration;
+                _logger?.LogDebug($"Pre-update ======> ");
+                LogConfiguration();
+                _logger?.LogDebug($"Incoming config ======> ");
+                newConfig.LogConfiguration();                
+                InputDevice = newConfig.InputDevice;
+                OutputDevice = newConfig.OutputDevice;
+                FireAndResetAxes = newConfig.FireAndResetAxes;
+                WaitToReset = newConfig.WaitToReset;
+                FireThreshold = newConfig.FireThreshold;
+                ResetThreshold = newConfig.ResetThreshold;
+                IgnoreAllButtons = newConfig.IgnoreAllButtons;
+                IgnoreAllAxes = newConfig.IgnoreAllAxes;
+                IgnoredButtons = newConfig.IgnoredButtons;
+                IgnoredAxes = newConfig.IgnoredAxes;
+                MappedButtons = newConfig.MappedButtons;
+                MappedAxes = newConfig.MappedAxes;
+                _logger?.LogDebug($"Post-update ======> ");
+                LogConfiguration();
+            }
+        }        
+
+        public void Save() {
+            string configFile = _configuration.GetValue<string>("Options:ControllerSettingsFile", DEFAULT_SETTINGS_FILE);
+            File.WriteAllText(configFile, JsonSerializer.Serialize<PipelineConfig>(this, _jsonOptions));
         }
 
         private void LogConfiguration() {
-            _logger.LogInformation($"InputDevice: {InputDevice} OutputDevice: {OutputDevice}");
+            _logger?.LogInformation($"InputDevice: {InputDevice} OutputDevice: {OutputDevice}");
             string fireAxes = String.Join(",", FireAndResetAxes.Select(x => x.ToString()));
-            _logger.LogInformation($"FireAndResetAxes: {fireAxes} WaitToReset: {WaitToReset} FireThreshold: {FireThreshold} ResetThreshold: {ResetThreshold}");
+            _logger?.LogInformation($"FireAndResetAxes: {fireAxes} WaitToReset: {WaitToReset} FireThreshold: {FireThreshold} ResetThreshold: {ResetThreshold}");
             string ignoredButtonsList = String.Join(",", IgnoredButtons.Select(x => x.ToString()));
-            _logger.LogInformation($"IgnoreAllButtons: {IgnoreAllButtons} IgnoredButtons: {ignoredButtonsList}");
+            _logger?.LogInformation($"IgnoreAllButtons: {IgnoreAllButtons} IgnoredButtons: {ignoredButtonsList}");
             string ignoredAxesList = String.Join(",", IgnoredAxes.Select(x => x.ToString()));
-            _logger.LogInformation($"IgnoreAllAxes: {IgnoreAllAxes} IgnoredAxes: {ignoredAxesList}");
+            _logger?.LogInformation($"IgnoreAllAxes: {IgnoreAllAxes} IgnoredAxes: {ignoredAxesList}");
             string mappedButtonList = String.Join(" ", MappedButtons);
-            _logger.LogInformation($"MappedButtons: {mappedButtonList}");
+            _logger?.LogInformation($"MappedButtons: {mappedButtonList}");
+            string mappedAxesList = String.Join(" ", MappedAxes);
+            _logger?.LogInformation($"MappedAxes: {mappedAxesList}");
         }
 
         private HashSet<byte> ParseList(string list) {
@@ -89,6 +126,15 @@ namespace XacAssist.JitM {
                 }                
             }
             return map;
+        }
+
+        private string ToConfigMap(Dictionary<byte, byte> map) {
+            string mapString = "";
+            foreach(KeyValuePair<byte, byte> value in map) {
+                mapString += $"{value.Key}={value.Value},";
+            }
+            if (mapString.EndsWith(",")) { mapString = mapString.TrimEnd(','); }
+            return mapString;
         }
     }
 }

@@ -19,5 +19,7 @@ namespace XacAssist.JitM {
         bool IsIgnoreAxis(byte inputAxis);
 
         void ReadConfiguration();
+        void FromJSON(string jsonText);
+        void Save();
     }
 }
