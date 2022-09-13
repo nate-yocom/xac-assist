@@ -107,7 +107,9 @@ The default settings are encapsulated in the [src/xac-assist/controller_settings
         5        
     ],
     "mappedButtons": {},
-    "mappedAxes": {}
+    "mappedAxes": {},
+    "allowAxisHoldToFlow": true,
+    "axisHoldToFlowHoldTimeMilliseconds": 1500
 }
 ```
 
@@ -125,6 +127,8 @@ To change, you could edit this file then re-deploy.  These settings are:
 - ignoredAxes: A list of axes to filter out
 - mappedButtons: A dictionary of buttons to their mapped values
 - mappedAxes: A dictionary of buttons to their mapped values
+- allowAxisHoldToFlow: Boolean indicating whether the values for an axis should be transmitted continually once some threshold 'hold' time is met - i.e. hold-to-scroll
+- axisHoldToFlowHoldTimeMilliseconds: The number of milliseconds (fidelity of +/-10ms) to wait before allowing axis data through
 
 ### The Web API
 
