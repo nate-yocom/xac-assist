@@ -15,6 +15,8 @@ namespace XacAssist.JitM {
         public HashSet<byte> IgnoredAxes { get; set; } = new HashSet<byte>();                
         public Dictionary<byte, byte> MappedButtons { get; set; } = new Dictionary<byte, byte>();
         public Dictionary<byte, byte> MappedAxes { get; set; } = new Dictionary<byte, byte>();
+        public bool AllowAxisHoldToFlow { get; set; } = true;
+        public int AxisHoldToFlowHoldTimeMilliseconds { get; set; } = 1500;
 
 
         private const string DEFAULT_SETTINGS_FILE = "controller_settings.json";

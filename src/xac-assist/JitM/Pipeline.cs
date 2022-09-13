@@ -1,6 +1,8 @@
 using Nfw.Linux.Joystick.Smart;
 using Nfw.Linux.Hid.Joystick;
 
+using System.Diagnostics;
+
 namespace XacAssist.JitM {
 
     public class Pipeline : IPipeline {
@@ -15,7 +17,8 @@ namespace XacAssist.JitM {
         
         private Joystick? _inputJoystick;
         private SimpleJoystick? _outputJoystick;
-        private Dictionary<byte, bool> _currentlyFiredAxis = new Dictionary<byte, bool>();        
+        private Stopwatch _stopwatch = Stopwatch.StartNew();
+        private Dictionary<byte, TimeSpan> _currentlyFiredAxis = new Dictionary<byte, TimeSpan>();
         private object _mutex = new object();
         
         public Pipeline(ILogger<Pipeline> logger, ILoggerFactory loggerFactory, IPipelineConfig configuration) {
@@ -32,6 +35,19 @@ namespace XacAssist.JitM {
             _inputJoystick = new Joystick(_configuration.InputDevice, _loggerFactory.CreateLogger(_configuration.InputDevice), ButtonEventTypes.Press | ButtonEventTypes.Release);            
             _inputJoystick.ButtonCallback = ButtonCallback;
             _inputJoystick.AxisCallback = AxisCallback;
+        }
+
+        public void Tick() {
+            if (_configuration.AllowAxisHoldToFlow) {
+                lock(_mutex) {
+                    foreach(KeyValuePair<byte, TimeSpan> kv in _currentlyFiredAxis) {
+                        if ((_stopwatch.Elapsed - kv.Value).TotalMilliseconds >= _configuration.AxisHoldToFlowHoldTimeMilliseconds) {
+                            _logger.LogTrace($"Tick firing axis as a result of duration {kv.Key} => {_stopwatch.Elapsed - kv.Value} => {_inputJoystick!.AxisValue(kv.Key)}");
+                            _outputJoystick?.UpdateAxis(kv.Key, ScaleAxisValue(_inputJoystick!.AxisValue(kv.Key)));
+                        }
+                    }
+                }
+            }
         }
 
         // Removes JS hooks and any other cleanup
@@ -74,18 +90,20 @@ namespace XacAssist.JitM {
                     _outputJoystick?.UpdateAxis(axisId, ScaleAxisValue(value));
                 } else {
                     float currentValuePercentage = Math.Abs(value) / INPUT_AXIS_MAX;
+
                     if (IsAxisCurrentlyFired(axisId) && currentValuePercentage <= _configuration.ResetThreshold) {
+                        // Fired, but moving back toward zero ==> Reset
                         _logger.LogDebug($"Hit {axisId} RESET at value: {value} [{currentValuePercentage * 100.0f}%]");
-                        SetAxisCurrentlyFired(axisId, false);
+                        SetAxisNotFired(axisId);
+                        _outputJoystick?.UpdateAxis(axisId, RESET_VALUE);
                     } else if (!IsAxisCurrentlyFired(axisId) && currentValuePercentage >= _configuration.FireThreshold) {
+                        // Not fired, but moved far enough to trigger? ==> Emit a fire, delay, then 0.
                         _logger.LogDebug($"Hit {axisId} FIRE at value {value} [{currentValuePercentage * 100.0f}%]");
                         _outputJoystick?.UpdateAxis(axisId, value < 0 ? SimpleJoystick.MIN_AXIS_VALUE : SimpleJoystick.MAX_AXIS_VALUE);
                         Thread.Sleep(_configuration.WaitToReset);
                         _logger.LogDebug($"Axis {axisId} auto-RESET after FIRING");
                         _outputJoystick?.UpdateAxis(axisId, RESET_VALUE);
-                        SetAxisCurrentlyFired(axisId, true);
-                    } else {
-                        _logger.LogTrace($"IGNORE Axis {axisId} Value {value} => CurrentlyFired: {IsAxisCurrentlyFired(axisId)}");
+                        SetAxisCurrentlyFired(axisId);
                     }
                 }
             } 
@@ -95,17 +113,20 @@ namespace XacAssist.JitM {
             _logger.LogInformation($"{joystick.DeviceName} => Connected[{connected}]");
         }
 
-        private bool IsAxisCurrentlyFired(byte axis) {            
-            if (!_currentlyFiredAxis.ContainsKey(axis)) {
-                _currentlyFiredAxis[axis] = false;
-                return false;
-            }
-
-            return _currentlyFiredAxis[axis];
+        private bool IsAxisCurrentlyFired(byte axis) {
+            return _currentlyFiredAxis.ContainsKey(axis);
         }
 
-        private void SetAxisCurrentlyFired(byte axis, bool value) {            
-            _currentlyFiredAxis[axis] = value;            
+        private void SetAxisCurrentlyFired(byte axis) {
+            _currentlyFiredAxis[axis] = _stopwatch.Elapsed;
+        }
+
+        private void SetAxisNotFired(byte axis) {
+            _currentlyFiredAxis.Remove(axis);
+        }
+
+        private TimeSpan AxisFiredDuration(byte axis) {
+            return (IsAxisCurrentlyFired(axis) ? (_stopwatch.Elapsed - _currentlyFiredAxis[axis]) : TimeSpan.MinValue);
         }
 
         private sbyte ScaleAxisValue(short inputValue) {

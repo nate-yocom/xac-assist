@@ -8,6 +8,8 @@ namespace XacAssist.JitM {
         float ResetThreshold { get; set; }
         bool IgnoreAllButtons { get; set; }
         bool IgnoreAllAxes { get; set; }
+        bool AllowAxisHoldToFlow { get; set; }
+        int AxisHoldToFlowHoldTimeMilliseconds { get; set; }
         HashSet<byte> IgnoredButtons { get; set; }
         HashSet<byte> IgnoredAxes { get; set; }        
         Dictionary<byte, byte> MappedButtons { get; set; }
