@@ -10,16 +10,6 @@ namespace XacAssist.JitM {
         bool IgnoreAllAxes { get; set; }
         bool AllowAxisHoldToFlow { get; set; }
         int AxisHoldToFlowHoldTimeMilliseconds { get; set; }
-        HashSet<byte> IgnoredButtons { get; set; }
-        HashSet<byte> IgnoredAxes { get; set; }        
-        Dictionary<byte, byte> MappedButtons { get; set; }
-        Dictionary<byte, byte> MappedAxes { get; set; }
-
-        byte MapButtonIfMapped(byte inputButton);
-        byte MapAxisIfMapped(byte inputAxis);
-        bool IsIgnoreButton(byte inputButton);
-        bool IsIgnoreAxis(byte inputAxis);
-
         void ReadConfiguration();
         void FromJSON(string jsonText);
         void Save();

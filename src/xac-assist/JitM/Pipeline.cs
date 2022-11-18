@@ -64,26 +64,19 @@ namespace XacAssist.JitM {
 
         private void ButtonCallback(Joystick joystick, byte buttonId, ButtonEventTypes eventType, bool pressed, TimeSpan elapsed) {
             lock(_mutex) {
-                _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Button[{buttonId}->{_configuration.MapButtonIfMapped(buttonId)}]:{eventType} Pressed=>{pressed} [{elapsed}]");
+                _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Button[{buttonId}]:{eventType} Pressed=>{pressed} [{elapsed}]");
 
                 if (_configuration.IgnoreAllButtons) return;
-
-                byte actualButton = _configuration.MapButtonIfMapped(buttonId);
-                if (!_configuration.IsIgnoreButton(actualButton)) return;
                 
-                _outputJoystick?.UpdateButton(actualButton, eventType == ButtonEventTypes.Press);
+                _outputJoystick?.UpdateButton(buttonId, eventType == ButtonEventTypes.Press);
             }
         }
 
         private void AxisCallback(Joystick joystick, byte axisId, short value, TimeSpan elapsed) {
             lock(_mutex) {
-                _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Axis[{axisId}->{_configuration.MapAxisIfMapped(axisId)}]:{value} [{elapsed}]");
+                _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Axis[{axisId}]:{value} [{elapsed}]");
 
                 if (_configuration.IgnoreAllAxes) return;
-
-                axisId = _configuration.MapAxisIfMapped(axisId);
-
-                if (_configuration.IsIgnoreAxis(axisId)) return;
 
                 // If not in our fire and reset list, we just pass through
                 if (!_configuration.FireAndResetAxes.Contains(axisId)) {
