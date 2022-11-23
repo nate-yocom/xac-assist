@@ -1,15 +1,4 @@
 {
     "inputDevice": "/dev/input/js0",
-    "outputDevice": "/dev/hidg0",
-    "fireAndResetAxes": [
-        0,
-        1
-    ],
-    "waitToReset": 50,
-    "fireThreshold": 0.8,
-    "resetThreshold": 0.15,
-    "ignoreAllButtons": true,
-    "ignoreAllAxes": false,
-    "allowAxisHoldToFlow": true,
-    "axisHoldToFlowHoldTimeMilliseconds": 1500
+    "outputDevice": "/dev/hidg0"
 }
