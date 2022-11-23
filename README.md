@@ -12,11 +12,10 @@ While the XaC is an amazing device, it can pose a couple of challenges for those
 The XaC-Assist solves both of these with features like:
 
 - Use any input joystick supported by the Linux kernel (including newer models of the 3D Pro)
-- Re-map buttons on the external joystick (i.e. make the trigger look like A, or B etc)
-- Re-map axes on the external joystick
 - Ignore any / all buttons (avoid accidental clicks!)
 - Ignore any / all axes (avoid accidental movement)
 - Simulate axis movement to compensate for jitter (Reduce/remove accidental scroll, slide, or over-movement!)
+- Scale axis movement so larger movement of the joystick results in smaller movement emitted to the XaC
 
 ### More on Axes Compensation
 
@@ -89,27 +88,7 @@ The default settings are encapsulated in the [src/xac-assist/controller_settings
 ```json
 {
     "inputDevice": "/dev/input/js0",
-    "outputDevice": "/dev/hidg0",
-    "fireAndResetAxes": [
-        0,
-        1
-    ],
-    "waitToReset": 50,
-    "fireThreshold": 0.8,
-    "resetThreshold": 0.15,
-    "ignoreAllButtons": true,
-    "ignoreAllAxes": false,
-    "ignoredButtons": [],
-    "ignoredAxes": [
-        2,
-        3,
-        4,
-        5        
-    ],
-    "mappedButtons": {},
-    "mappedAxes": {},
-    "allowAxisHoldToFlow": true,
-    "axisHoldToFlowHoldTimeMilliseconds": 1500
+    "outputDevice": "/dev/hidg0"    
 }
 ```
 
@@ -117,18 +96,6 @@ To change, you could edit this file then re-deploy.  These settings are:
 
 - inputDevice: The input dev file used to read the joystick events
 - outputDevice: The HID OTG gadget to write output to the XaC
-- fireAndResetAxes: A list of the axes which should be compensated (as described above)
-- waitToReset: How long should a 'fired' compensated axis remain in that state (in milliseconds)
-- fireThreshold: At what % of full movement should the axis fire
-- resetThreshold: At what % of movement should the axis return to being fireable again
-- ignoreAllButtons: Set to true to ignore (and do not pass on) all button input
-- ignoreAllAxes: Set to true to ignore (and do not pass on) all axes input
-- ignoredButtons: A list of specific buttons to filter out
-- ignoredAxes: A list of axes to filter out
-- mappedButtons: A dictionary of buttons to their mapped values
-- mappedAxes: A dictionary of buttons to their mapped values
-- allowAxisHoldToFlow: Boolean indicating whether the values for an axis should be transmitted continually once some threshold 'hold' time is met - i.e. hold-to-scroll
-- axisHoldToFlowHoldTimeMilliseconds: The number of milliseconds (fidelity of +/-10ms) to wait before allowing axis data through
 
 ### The Web API
 
@@ -140,25 +107,7 @@ Alternatively, once running, the service will listen on port 5000 for HTTP reque
 $ curl -s http://hostname:5000/config
 {
   "inputDevice": "/dev/input/js0",
-  "outputDevice": "/dev/hidg0",
-  "fireAndResetAxes": [
-    0,
-    1
-  ],
-  "waitToReset": 50,
-  "fireThreshold": 0.8,
-  "resetThreshold": 0.15,
-  "ignoreAllButtons": true,
-  "ignoreAllAxes": false,
-  "ignoredButtons": [],
-  "ignoredAxes": [
-    2,
-    3,
-    4,
-    5
-  ],
-  "mappedButtons": {},
-  "mappedAxes": {}
+  "outputDevice": "/dev/hidg0"
 }
 ```
 
@@ -172,25 +121,7 @@ curl -0 -v -X POST http://hostname:5000/config \
 --data-binary @- << EOF
 {
   "inputDevice": "/dev/input/js0",
-  "outputDevice": "/dev/hidg0",
-  "fireAndResetAxes": [
-    0,
-    1
-  ],
-  "waitToReset": 50,
-  "fireThreshold": 0.8,
-  "resetThreshold": 0.15,
-  "ignoreAllButtons": true,
-  "ignoreAllAxes": false,
-  "ignoredButtons": [],
-  "ignoredAxes": [
-    2,
-    3,
-    4,
-    5
-  ],
-  "mappedButtons": {},
-  "mappedAxes": {}
+  "outputDevice": "/dev/hidg0"
 }
 EOF
 ```

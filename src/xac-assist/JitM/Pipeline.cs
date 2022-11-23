@@ -1,6 +1,8 @@
 using Nfw.Linux.Joystick.Smart;
 using Nfw.Linux.Hid.Joystick;
 
+using XacAssist.Features;
+
 using System.Diagnostics;
 
 namespace XacAssist.JitM {
@@ -11,15 +13,13 @@ namespace XacAssist.JitM {
         private readonly ILoggerFactory _loggerFactory;
         private readonly IPipelineConfig _configuration;
 
-        private const float INPUT_AXIS_MIN = -32768;
-        private const float INPUT_AXIS_MAX = 32768;
-        private const sbyte RESET_VALUE = 0x00;
-        
         private Joystick? _inputJoystick;
         private SimpleJoystick? _outputJoystick;
-        private Stopwatch _stopwatch = Stopwatch.StartNew();
-        private Dictionary<byte, TimeSpan> _currentlyFiredAxis = new Dictionary<byte, TimeSpan>();
         private object _mutex = new object();
+
+
+        private List<Feature> _features = new List<Feature>();
+
         
         public Pipeline(ILogger<Pipeline> logger, ILoggerFactory loggerFactory, IPipelineConfig configuration) {
             _logger = logger;
@@ -32,20 +32,29 @@ namespace XacAssist.JitM {
             _logger.LogDebug($"Start()");
             _configuration.ReadConfiguration();
             _outputJoystick = new SimpleJoystick(_configuration.OutputDevice,_loggerFactory.CreateLogger(_configuration.OutputDevice));
-            _inputJoystick = new Joystick(_configuration.InputDevice, _loggerFactory.CreateLogger(_configuration.InputDevice), ButtonEventTypes.Press | ButtonEventTypes.Release);            
+            _inputJoystick = new Joystick(_configuration.InputDevice, _loggerFactory.CreateLogger(_configuration.InputDevice), ButtonEventTypes.Press | ButtonEventTypes.Release | ButtonEventTypes.LongPress);
+            _inputJoystick.DefaultButtonSettings.LongPressMinimumDurationMilliseconds = 1500;
             _inputJoystick.ButtonCallback = ButtonCallback;
             _inputJoystick.AxisCallback = AxisCallback;
+
+            _features.Clear();
+            _features.Add(new FullPassThru(_loggerFactory, _inputJoystick, _outputJoystick) { Enabled = false, ToggleButton = 6 });
+            // Single fire and Scaled axis both want to muck with axis - and are mutuall exclusive - so .. they use the same toggle, but 
+            //  different initial states.  We start with the single fire feature on, toggling that off will toggle the scaled axis ON.
+            _features.Add(new SingleFireAxis(_loggerFactory, _inputJoystick, _outputJoystick) { Enabled = true, ToggleButton = 7 });
+            _features.Add(new ScaledAxis(_loggerFactory, _inputJoystick, _outputJoystick) { Enabled = false, ToggleButton = 7 });
+            _features.Add(new IgnoreButtons(_loggerFactory, _inputJoystick, _outputJoystick) { Enabled = true, ToggleButton = 8 });
+
+            foreach(Feature feature in _features) {
+                _logger.LogDebug($"Starting feature: {feature.Name} Enabled => {feature.Enabled} Toggle => {feature.ToggleButton}");
+                feature.Start();
+            }
         }
 
         public void Tick() {
-            if (_configuration.AllowAxisHoldToFlow) {
-                lock(_mutex) {
-                    foreach(KeyValuePair<byte, TimeSpan> kv in _currentlyFiredAxis) {
-                        if ((_stopwatch.Elapsed - kv.Value).TotalMilliseconds >= _configuration.AxisHoldToFlowHoldTimeMilliseconds) {
-                            _logger.LogTrace($"Tick firing axis as a result of duration {kv.Key} => {_stopwatch.Elapsed - kv.Value} => {_inputJoystick!.AxisValue(kv.Key)}");
-                            _outputJoystick?.UpdateAxis(kv.Key, ScaleAxisValue(_inputJoystick!.AxisValue(kv.Key)));
-                        }
-                    }
+            lock(_mutex) {
+                foreach(Feature feature in _features) {
+                    feature.Tick();
                 }
             }
         }
@@ -53,22 +62,61 @@ namespace XacAssist.JitM {
         // Removes JS hooks and any other cleanup
         public void Stop() {
             _logger.LogDebug($"Stop()");
-            if (_inputJoystick != null) {
-                _inputJoystick.ButtonCallback = null;
-                _inputJoystick.AxisCallback = null;
-                _inputJoystick.ConnectedCallback = null;
-                _inputJoystick.Dispose();
+
+            lock(_mutex) {
+                foreach(Feature feature in _features) {
+                    feature.Stop();
+                }
+
+                if (_inputJoystick != null) {
+                    _inputJoystick.ButtonCallback = null;
+                    _inputJoystick.AxisCallback = null;
+                    _inputJoystick.ConnectedCallback = null;
+                    _inputJoystick.Dispose();
+                }
+                _outputJoystick = null;
             }
-            _outputJoystick = null;
         }
 
         private void ButtonCallback(Joystick joystick, byte buttonId, ButtonEventTypes eventType, bool pressed, TimeSpan elapsed) {
             lock(_mutex) {
                 _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Button[{buttonId}]:{eventType} Pressed=>{pressed} [{elapsed}]");
 
-                if (_configuration.IgnoreAllButtons) return;
-                
-                _outputJoystick?.UpdateButton(buttonId, eventType == ButtonEventTypes.Press);
+                // Long press button 0 means dump state
+                if (eventType == ButtonEventTypes.LongPress && buttonId == 0) {
+                    _logger.LogDebug($"===== CURRENT FEATURE STATE ======");
+                    foreach(Feature feature in _features) {
+                        _logger.LogDebug($"  {feature.Name} Enabled=>{feature.Enabled} Toggle=>{feature.ToggleButton}");
+                    }
+                }
+
+                // Long press means toggle
+                if (eventType == ButtonEventTypes.LongPress && _features.Any(f => f.ToggleButton == buttonId)) {
+                    foreach(Feature feature in _features.Where(f => f.ToggleButton == buttonId)) {
+                        _logger.LogDebug($"Toggling {feature.Name} from {feature.Enabled} to {!feature.Enabled}");
+                        feature.Enabled = !feature.Enabled;
+                    }
+                    // We always emit an NOT PRESSED then return, as this button press has done what it was meant to do.
+                    _outputJoystick?.UpdateButton(buttonId, false);
+                    return;
+                }
+
+                bool swallowed = false;
+                foreach(Feature feature in _features) {
+                    if(feature.Enabled) {
+                        _logger.LogTrace($"===> {feature.Name} => Button[{buttonId}] Pressed=>{pressed}");
+                        var action = feature.ButtonFilter(ref buttonId, eventType, ref pressed, elapsed);
+                        _logger.LogTrace($"<=== {action} from {feature.Name} => Button[{buttonId}] Pressed=>{pressed}");
+                        swallowed |= action == Feature.FeatureFilterAction.Swallowed || action == Feature.FeatureFilterAction.Stop;
+                        if (action == Feature.FeatureFilterAction.Stop)
+                            break;
+                    }
+                }
+
+                if (!swallowed) {
+                    _logger.LogTrace($"Updating output Button[{buttonId}] Pressed=>{pressed}");
+                    _outputJoystick?.UpdateButton(buttonId, pressed);
+                }
             }
         }
 
@@ -76,64 +124,27 @@ namespace XacAssist.JitM {
             lock(_mutex) {
                 _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Axis[{axisId}]:{value} [{elapsed}]");
 
-                if (_configuration.IgnoreAllAxes) return;
-
-                // If not in our fire and reset list, we just pass through
-                if (!_configuration.FireAndResetAxes.Contains(axisId)) {
-                    _outputJoystick?.UpdateAxis(axisId, ScaleAxisValue(value));
-                } else {
-                    float currentValuePercentage = Math.Abs(value) / INPUT_AXIS_MAX;
-
-                    if (IsAxisCurrentlyFired(axisId) && currentValuePercentage <= _configuration.ResetThreshold) {
-                        // Fired, but moving back toward zero ==> Reset
-                        _logger.LogDebug($"Hit {axisId} RESET at value: {value} [{currentValuePercentage * 100.0f}%]");
-                        SetAxisNotFired(axisId);
-                        _outputJoystick?.UpdateAxis(axisId, RESET_VALUE);
-                    } else if (!IsAxisCurrentlyFired(axisId) && currentValuePercentage >= _configuration.FireThreshold) {
-                        // Not fired, but moved far enough to trigger? ==> Emit a fire, delay, then 0.
-                        _logger.LogDebug($"Hit {axisId} FIRE at value {value} [{currentValuePercentage * 100.0f}%]");
-                        _outputJoystick?.UpdateAxis(axisId, value < 0 ? SimpleJoystick.MIN_AXIS_VALUE : SimpleJoystick.MAX_AXIS_VALUE);
-                        Thread.Sleep(_configuration.WaitToReset);
-                        _logger.LogDebug($"Axis {axisId} auto-RESET after FIRING");
-                        _outputJoystick?.UpdateAxis(axisId, RESET_VALUE);
-                        SetAxisCurrentlyFired(axisId);
+                bool swallowed = false;
+                foreach(Feature feature in _features) {
+                    if(feature.Enabled) {
+                        _logger.LogTrace($"===> {feature.Name} => Axis[{axisId}]:{value}");
+                        var action = feature.AxisFilter(ref axisId, ref value, elapsed);
+                        _logger.LogTrace($"<===  {action} from {feature.Name} => Axis[{axisId}]:{value}");
+                        swallowed |= action == Feature.FeatureFilterAction.Swallowed || action == Feature.FeatureFilterAction.Stop;
+                        if (action == Feature.FeatureFilterAction.Stop)
+                            break;
                     }
                 }
-            } 
+
+                if (!swallowed) {
+                    _logger.LogTrace($"Updating output Axis[{axisId}]:{value}");
+                    _outputJoystick?.UpdateAxis(axisId, Utility.AxisHelper.ScaleAxisValue(value));
+                }
+            }
         }
 
         private void ConnectedCallback(Joystick joystick, bool connected) {
             _logger.LogInformation($"{joystick.DeviceName} => Connected[{connected}]");
-        }
-
-        private bool IsAxisCurrentlyFired(byte axis) {
-            return _currentlyFiredAxis.ContainsKey(axis);
-        }
-
-        private void SetAxisCurrentlyFired(byte axis) {
-            _currentlyFiredAxis[axis] = _stopwatch.Elapsed;
-        }
-
-        private void SetAxisNotFired(byte axis) {
-            _currentlyFiredAxis.Remove(axis);
-        }
-
-        private TimeSpan AxisFiredDuration(byte axis) {
-            return (IsAxisCurrentlyFired(axis) ? (_stopwatch.Elapsed - _currentlyFiredAxis[axis]) : TimeSpan.MinValue);
-        }
-
-        private sbyte ScaleAxisValue(short inputValue) {
-            sbyte result = 0;
-            if (inputValue != 0) {            
-                float percentOfMax = Math.Abs(inputValue) / INPUT_AXIS_MAX;
-                int newValue = (int) (percentOfMax * (float) (SimpleJoystick.MAX_AXIS_VALUE + 1));
-                if (inputValue < 0) newValue *= -1;
-                newValue = Math.Clamp(newValue, SimpleJoystick.MIN_AXIS_VALUE, SimpleJoystick.MAX_AXIS_VALUE);
-                
-                result = (sbyte) newValue;
-            }
-            _logger.LogTrace($"Scaled {inputValue} => {result}");
-            return result;
         }
     }
 }
