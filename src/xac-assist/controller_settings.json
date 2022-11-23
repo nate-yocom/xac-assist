@@ -10,15 +10,6 @@
     "resetThreshold": 0.15,
     "ignoreAllButtons": true,
     "ignoreAllAxes": false,
-    "ignoredButtons": [],
-    "ignoredAxes": [
-        2,
-        3,
-        4,
-        5        
-    ],
-    "mappedButtons": {},
-    "mappedAxes": {},
     "allowAxisHoldToFlow": true,
     "axisHoldToFlowHoldTimeMilliseconds": 1500
 }

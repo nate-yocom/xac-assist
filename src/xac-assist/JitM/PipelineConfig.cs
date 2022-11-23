@@ -11,10 +11,6 @@ namespace XacAssist.JitM {
         public float ResetThreshold { get; set; } = 0.15f;
         public bool IgnoreAllButtons { get; set; } = true;
         public bool IgnoreAllAxes { get; set; } = false;
-        public HashSet<byte> IgnoredButtons { get; set; } = new HashSet<byte>();
-        public HashSet<byte> IgnoredAxes { get; set; } = new HashSet<byte>();                
-        public Dictionary<byte, byte> MappedButtons { get; set; } = new Dictionary<byte, byte>();
-        public Dictionary<byte, byte> MappedAxes { get; set; } = new Dictionary<byte, byte>();
         public bool AllowAxisHoldToFlow { get; set; } = true;
         public int AxisHoldToFlowHoldTimeMilliseconds { get; set; } = 1500;
 
@@ -34,22 +30,6 @@ namespace XacAssist.JitM {
         }
 
         public PipelineConfig() {            
-        }
-
-        public byte MapButtonIfMapped(byte inputButton) {
-            return MappedButtons.ContainsKey(inputButton) ? MappedButtons[inputButton] : inputButton;
-        }
-
-        public byte MapAxisIfMapped(byte inputAxis) {
-            return MappedAxes.ContainsKey(inputAxis) ? MappedAxes[inputAxis] : inputAxis;
-        }
-
-        public bool IsIgnoreButton(byte inputButton) {
-            return IgnoreAllButtons || IgnoredButtons.Contains(inputButton);
-        }
-
-        public bool IsIgnoreAxis(byte inputAxis) {
-            return IgnoreAllAxes || IgnoredAxes.Contains(inputAxis);
         }
 
         public void ReadConfiguration() {
@@ -77,10 +57,8 @@ namespace XacAssist.JitM {
                 ResetThreshold = newConfig.ResetThreshold;
                 IgnoreAllButtons = newConfig.IgnoreAllButtons;
                 IgnoreAllAxes = newConfig.IgnoreAllAxes;
-                IgnoredButtons = newConfig.IgnoredButtons;
-                IgnoredAxes = newConfig.IgnoredAxes;
-                MappedButtons = newConfig.MappedButtons;
-                MappedAxes = newConfig.MappedAxes;
+                AllowAxisHoldToFlow = newConfig.AllowAxisHoldToFlow;
+                AxisHoldToFlowHoldTimeMilliseconds = newConfig.AxisHoldToFlowHoldTimeMilliseconds;
                 _logger?.LogDebug($"Post-update ======> ");
                 LogConfiguration();
             }
@@ -95,48 +73,8 @@ namespace XacAssist.JitM {
             _logger?.LogInformation($"InputDevice: {InputDevice} OutputDevice: {OutputDevice}");
             string fireAxes = String.Join(",", FireAndResetAxes.Select(x => x.ToString()));
             _logger?.LogInformation($"FireAndResetAxes: {fireAxes} WaitToReset: {WaitToReset} FireThreshold: {FireThreshold} ResetThreshold: {ResetThreshold}");
-            string ignoredButtonsList = String.Join(",", IgnoredButtons.Select(x => x.ToString()));
-            _logger?.LogInformation($"IgnoreAllButtons: {IgnoreAllButtons} IgnoredButtons: {ignoredButtonsList}");
-            string ignoredAxesList = String.Join(",", IgnoredAxes.Select(x => x.ToString()));
-            _logger?.LogInformation($"IgnoreAllAxes: {IgnoreAllAxes} IgnoredAxes: {ignoredAxesList}");
-            string mappedButtonList = String.Join(" ", MappedButtons);
-            _logger?.LogInformation($"MappedButtons: {mappedButtonList}");
-            string mappedAxesList = String.Join(" ", MappedAxes);
-            _logger?.LogInformation($"MappedAxes: {mappedAxesList}");
-        }
-
-        private HashSet<byte> ParseList(string list) {
-            if (string.IsNullOrWhiteSpace(list))
-                return new HashSet<byte>();
-
-            // 0,5,6            
-            string[] values = list.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            return values.Where(x => byte.TryParse(x, out byte test)).Select(x => byte.Parse(x)).ToHashSet();            
-        }
-
-        private Dictionary<byte, byte> ParseMap(string mapString) {
-            if (string.IsNullOrWhiteSpace(mapString))
-                return new Dictionary<byte, byte>();;
-            
-            // A=B,C=D
-            Dictionary<byte, byte> map = new Dictionary<byte, byte>();
-            string[] values = mapString.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);            
-            foreach(string value in values) {
-                string[] bits = value.Split('=', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                if (bits.Length == 2 && byte.TryParse(bits[0], out byte t) && byte.TryParse(bits[1], out byte t2)) {
-                    map[byte.Parse(bits[0])] = byte.Parse(bits[1]);
-                }                
-            }
-            return map;
-        }
-
-        private string ToConfigMap(Dictionary<byte, byte> map) {
-            string mapString = "";
-            foreach(KeyValuePair<byte, byte> value in map) {
-                mapString += $"{value.Key}={value.Value},";
-            }
-            if (mapString.EndsWith(",")) { mapString = mapString.TrimEnd(','); }
-            return mapString;
+            _logger?.LogInformation($"IgnoreAllButtons: {IgnoreAllButtons} IgnoreAllAxes: {IgnoreAllAxes}");
+            _logger?.LogInformation($"AllowHoldToFlow: {AllowAxisHoldToFlow} Time: {AxisHoldToFlowHoldTimeMilliseconds}");
         }
     }
 }
