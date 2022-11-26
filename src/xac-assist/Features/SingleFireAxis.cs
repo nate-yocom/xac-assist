@@ -66,8 +66,9 @@ namespace XacAssist.Features {
                     _outputJoystick?.UpdateAxis(axisId, RESET_VALUE);
                 } else if (!IsAxisCurrentlyFired(axisId) && currentValuePercentage >= FireThreshold) {
                     // Not fired, but moved far enough to trigger? ==> Emit a fire, delay, then 0.
-                    _logger.LogDebug($"Hit {axisId} FIRE at value {value} [{currentValuePercentage * 100.0f}%]");
-                    _outputJoystick?.UpdateAxis(axisId, value < 0 ? SimpleJoystick.MIN_AXIS_VALUE : SimpleJoystick.MAX_AXIS_VALUE);
+                    sbyte send = value < 0 ? (sbyte) -127 : SimpleJoystick.MAX_AXIS_VALUE;
+                    _logger.LogDebug($"Hit {axisId} FIRE at value {value} [{currentValuePercentage * 100.0f}%] - Sending: {send}");
+                    _outputJoystick?.UpdateAxis(axisId, send);
                     Thread.Sleep(WaitToReset);
                     _logger.LogDebug($"Axis {axisId} auto-RESET after FIRING");
                     _outputJoystick?.UpdateAxis(axisId, RESET_VALUE);

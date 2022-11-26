@@ -33,7 +33,7 @@ namespace XacAssist.JitM {
             _configuration.ReadConfiguration();
             _outputJoystick = new SimpleJoystick(_configuration.OutputDevice,_loggerFactory.CreateLogger(_configuration.OutputDevice));
             _inputJoystick = new Joystick(_configuration.InputDevice, _loggerFactory.CreateLogger(_configuration.InputDevice), ButtonEventTypes.Press | ButtonEventTypes.Release | ButtonEventTypes.LongPress);
-            _inputJoystick.DefaultButtonSettings.LongPressMinimumDurationMilliseconds = 1500;
+            _inputJoystick.DefaultButtonSettings.LongPressMinimumDurationMilliseconds = 1000;
             _inputJoystick.ButtonCallback = ButtonCallback;
             _inputJoystick.AxisCallback = AxisCallback;
 

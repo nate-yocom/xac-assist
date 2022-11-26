@@ -8,7 +8,7 @@ namespace XacAssist.Features {
     public class ScaledAxis : Feature {
         public override string Name { get { return "Scaled Axis"; } }
 
-        public float ScaleAmount { get; set; } = 0.15f;
+        public float ScaleAmount { get; set; } = 0.50f;
 
 
         private ILogger<ScaledAxis> _logger;
@@ -29,12 +29,12 @@ namespace XacAssist.Features {
         
         public override FeatureFilterAction ButtonFilter(ref byte buttonId, ButtonEventTypes eventType, ref bool pressed, TimeSpan elapsed) {
             // Hack for now, in the absence of a UI for configuration... button 10 means -.05, button 11 means + 0.05
-            if (eventType == ButtonEventTypes.LongPress) {
+            if (eventType == ButtonEventTypes.Press) {
                 if (buttonId == 10) {
-                    ScaleAmount -= 0.01f;
+                    ScaleAmount -= 0.10f;
                     _logger.LogDebug($"Decremented scale amount to: {ScaleAmount}");
                 } else if (buttonId == 11) {
-                    ScaleAmount += 0.01f;
+                    ScaleAmount += 0.10f;
                     _logger.LogDebug($"Incremented scale amount to: {ScaleAmount}");
                 }
             }
