@@ -7,8 +7,11 @@
   </PropertyGroup>
   
   <ItemGroup>
+    <PackageReference Include="Nfw.Linux.Framebuffer" Version="1.0.1" />
     <PackageReference Include="Nfw.Linux.Hid" Version="1.0.2" />
     <PackageReference Include="Nfw.Linux.Joystick" Version="1.0.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.3" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta15" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="6.0.0" />
@@ -16,8 +19,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />    
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="controller_settings.json" Publish="true" />    
+  <ItemGroup>    
+    <None Include="data/images/**" CopyToPublishDirectory="Always" CopyToOutputDirectory="Always" Publish="true" />    
+    <None Include="data/fonts/**" CopyToPublishDirectory="Always" CopyToOutputDirectory="Always" Publish="true" />
   </ItemGroup>
     
 </Project>

@@ -12,9 +12,8 @@ builder.Services.AddControllers().AddJsonOptions(j => {
     j.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-builder.Services.AddSingleton<XacAssist.JitM.IPipelineConfig, XacAssist.JitM.PipelineConfig>();
-builder.Services.AddSingleton<XacAssist.JitM.IPipeline, XacAssist.JitM.Pipeline>();
-
+builder.Services.AddSingleton<XacAssist.Renderer.FeatureStatusRenderer>();
+builder.Services.AddSingleton<XacAssist.Pipeline.IPipeline, XacAssist.JitM.JitMPipeline>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

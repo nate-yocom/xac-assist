@@ -83,7 +83,7 @@ Once up and running, you have a few options for tweaking how the application beh
 
 ### The JSON File
 
-The default settings are encapsulated in the [src/xac-assist/controller_settings.json](https://github.com/nate-yocom/xac-assist/blob/main/src/xac-assist/controller_settings.json) file.  These are: 
+The default settings are encapsulated in the [src/xac-assist/data/controller_settings.json](https://github.com/nate-yocom/xac-assist/blob/main/src/xac-assist/data/controller_settings.json) file.  These are: 
 
 ```json
 {
