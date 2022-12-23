@@ -1,7 +1,15 @@
 using Nfw.Linux.Joystick.Smart;
 using Nfw.Linux.Hid.Joystick;
 
+using XacAssist.Renderer;
+
 using System.Diagnostics;
+
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace XacAssist.Features {
 
@@ -45,6 +53,18 @@ namespace XacAssist.Features {
         }
         
         public override void Stop() {
+        }
+
+        // TBD: For now this is hard coded based on the background image we're using and an 800x480 screen.
+        private static readonly PointF DEFAULT_TEXT_LOCATION = new PointF(425.0f, 90.0f);
+
+        public override void TickFrame(Image frame) {
+            // If we are enabled, we label MODE as scaled, and then include our hints for how to change the current scale
+            if (Enabled) {
+                frame.Mutate(f => {                    
+                    f.DrawText($"SINGLE-FIRE AXIS", FontManager.GetFont(FontStyle.Bold), Color.Blue, DEFAULT_TEXT_LOCATION);
+                });
+            }                        
         }
         
         public override FeatureFilterAction ButtonFilter(ref byte buttonId, ButtonEventTypes eventType, ref bool pressed, TimeSpan elapsed) {

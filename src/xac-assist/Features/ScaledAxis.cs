@@ -1,7 +1,13 @@
 using Nfw.Linux.Joystick.Smart;
 using Nfw.Linux.Hid.Joystick;
 
-using System.Diagnostics;
+using XacAssist.Renderer;
+
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace XacAssist.Features {
 
@@ -15,7 +21,7 @@ namespace XacAssist.Features {
 
         public ScaledAxis(ILoggerFactory loggerFactory, Joystick inputJoystick, SimpleJoystick outputJoystick) : 
             base(loggerFactory, inputJoystick, outputJoystick) {
-            _logger = loggerFactory.CreateLogger<ScaledAxis>();
+            _logger = loggerFactory.CreateLogger<ScaledAxis>();            
         }
                 
         public override void Start() {
@@ -26,16 +32,35 @@ namespace XacAssist.Features {
         
         public override void Stop() {
         }
+
+        // TBD: For now this is hard coded based on the background image we're using and an 800x480 screen.
+        private static readonly PointF DEFAULT_TEXT_LOCATION = new PointF(425.0f, 90.0f);
+        private static readonly Point IMAGE_OVERLAY_POSITION = new Point(0, 240);
+
+        // We load this once and hold onto it to avoid repeatedly having to load it etc
+        private Image<Bgr565> _scaleHintImage = Image.Load<Bgr565>("data/images/background_bottom.png");
+
+        public override void TickFrame(Image frame) {
+            // If we are enabled, we label MODE as scaled, and then include our hints for how to change the current scale
+            if (Enabled) {
+                frame.Mutate(f => {
+                    f.DrawImage(_scaleHintImage, IMAGE_OVERLAY_POSITION, 1.0f);
+                    f.DrawText($"SCALE AXIS BY {ScaleAmount.ToString("P0")}", FontManager.GetFont(FontStyle.Bold), Color.Blue, DEFAULT_TEXT_LOCATION);                    
+                });
+            }                        
+        }
         
         public override FeatureFilterAction ButtonFilter(ref byte buttonId, ButtonEventTypes eventType, ref bool pressed, TimeSpan elapsed) {
-            // Hack for now, in the absence of a UI for configuration... button 10 means -.05, button 11 means + 0.05
-            if (eventType == ButtonEventTypes.Press) {
-                if (buttonId == 10) {
-                    ScaleAmount -= 0.10f;
-                    _logger.LogDebug($"Decremented scale amount to: {ScaleAmount}");
-                } else if (buttonId == 11) {
-                    ScaleAmount += 0.10f;
-                    _logger.LogDebug($"Incremented scale amount to: {ScaleAmount}");
+            if (Enabled) {
+                // Hack for now, in the absence of a UI for configuration... button 10 means -.05, button 11 means + 0.05
+                if (eventType == ButtonEventTypes.Press) {
+                    if (buttonId == 10) {
+                        ScaleAmount = Math.Max(0.05f, ScaleAmount - 0.05f);
+                        _logger.LogDebug($"Decremented scale amount to: {ScaleAmount}");
+                    } else if (buttonId == 11) {
+                        ScaleAmount = Math.Min(1.0f, ScaleAmount + 0.05f);                        
+                        _logger.LogDebug($"Incremented scale amount to: {ScaleAmount}");
+                    }
                 }
             }
 

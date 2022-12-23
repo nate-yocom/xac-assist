@@ -1,13 +1,15 @@
-using Nfw.Linux.Joystick.Smart;
-using Nfw.Linux.Hid.Joystick;
-
 using XacAssist.JitM;
+using XacAssist.Pipeline;
+using XacAssist.Renderer;
 
 namespace XacAssist {    
     public class XacAssistWorker : BackgroundService
     {
         private readonly ILogger<XacAssistWorker> _logger;
+        private readonly ILoggerFactory _loggerFactory;
         private readonly IPipeline _pipeline;
+        private readonly IConfiguration _configuration;
+        private readonly FeatureStatusRenderer _featureRenderer;
 
         private const float INPUT_AXIS_MIN = -32768;
         private const float INPUT_AXIS_MAX = 32768;
@@ -23,9 +25,13 @@ namespace XacAssist {
         private HashSet<byte> _ignoreButtons = new HashSet<byte>();
         private HashSet<byte> _ignoreAxis = new HashSet<byte>();
         
-        public XacAssistWorker(ILogger<XacAssistWorker> logger, IPipeline pipeline) {
+        public XacAssistWorker(ILogger<XacAssistWorker> logger, IPipeline pipeline, 
+                                IConfiguration configuration, ILoggerFactory loggerFactory, FeatureStatusRenderer featureRenderer) {
             _logger = logger;
             _pipeline = pipeline;
+            _configuration = configuration;
+            _loggerFactory = loggerFactory;
+            _featureRenderer = featureRenderer;
         }
 
         private CancellationTokenSource _internalStopToken = new CancellationTokenSource();
@@ -34,7 +40,8 @@ namespace XacAssist {
             // Endless loop until stopped...
             _logger.LogInformation("ExecuteAsync() running"); 
 
-            _pipeline.Start();
+            _pipeline.Start();            
+            _featureRenderer.Start(_pipeline.Features);
                 
             while (!stoppingToken.IsCancellationRequested && !_internalStopToken.Token.IsCancellationRequested) {
                 await Task.Delay(10, stoppingToken);
@@ -42,6 +49,7 @@ namespace XacAssist {
             }
 
             _pipeline.Stop();
+            _featureRenderer.Stop();
 
             _logger.LogInformation("ExecuteAsync() signaled to stop");
             _shutdownComplete.Cancel();

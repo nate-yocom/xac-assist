@@ -1,6 +1,8 @@
 using Nfw.Linux.Joystick.Smart;
 using Nfw.Linux.Hid.Joystick;
 
+using SixLabors.ImageSharp;
+
 using System.Diagnostics;
 
 namespace XacAssist.Features {
@@ -35,6 +37,8 @@ namespace XacAssist.Features {
         public abstract void Tick();
         
         public abstract void Stop();
+
+        public virtual void TickFrame(Image frame) {}
         
         // Button and Axis filters are only called if Enabled == True
         public abstract FeatureFilterAction ButtonFilter(ref byte buttonId, ButtonEventTypes eventType, ref bool pressed, TimeSpan elapsed);

@@ -1,4 +1,0 @@
-{
-    "inputDevice": "/dev/input/js0",
-    "outputDevice": "/dev/hidg0"
-}

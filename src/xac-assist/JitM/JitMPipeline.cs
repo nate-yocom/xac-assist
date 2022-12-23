@@ -1,45 +1,46 @@
 using Nfw.Linux.Joystick.Smart;
 using Nfw.Linux.Hid.Joystick;
 
+using XacAssist.Pipeline;
 using XacAssist.Features;
 
-using System.Diagnostics;
+using System.Collections.ObjectModel;
 
 namespace XacAssist.JitM {
 
-    public class Pipeline : IPipeline {
+    public class JitMPipeline : IPipeline {
 
         private readonly ILogger _logger;
-        private readonly ILoggerFactory _loggerFactory;
-        private readonly IPipelineConfig _configuration;
+        private readonly ILoggerFactory _loggerFactory;        
+        private readonly IConfiguration _configuration;
 
         private Joystick? _inputJoystick;
-        private SimpleJoystick? _outputJoystick;
+        private SimpleJoystick? _outputJoystick;        
         private object _mutex = new object();
 
 
         private List<Feature> _features = new List<Feature>();
+        public ReadOnlyCollection<Feature> Features { get { return _features.AsReadOnly(); }}
 
         
-        public Pipeline(ILogger<Pipeline> logger, ILoggerFactory loggerFactory, IPipelineConfig configuration) {
-            _logger = logger;
+        public JitMPipeline(ILoggerFactory loggerFactory, IConfiguration configuration) {
+            _logger = loggerFactory.CreateLogger<JitMPipeline>();
             _configuration = configuration;
             _loggerFactory = loggerFactory;
         }
 
         // Reads configuration and sets up JS listen hooks
         public void Start() {
-            _logger.LogDebug($"Start()");
-            _configuration.ReadConfiguration();
-            _outputJoystick = new SimpleJoystick(_configuration.OutputDevice,_loggerFactory.CreateLogger(_configuration.OutputDevice));
-            _inputJoystick = new Joystick(_configuration.InputDevice, _loggerFactory.CreateLogger(_configuration.InputDevice), ButtonEventTypes.Press | ButtonEventTypes.Release | ButtonEventTypes.LongPress);
+            _logger.LogDebug($"Start()");            
+            _outputJoystick = new SimpleJoystick(_configuration["OutputDevice"], _loggerFactory.CreateLogger(_configuration["OutputDevice"]));
+            _inputJoystick = new Joystick(_configuration["InputDevice"], _loggerFactory.CreateLogger(_configuration["InputDevice"]), ButtonEventTypes.Press | ButtonEventTypes.Release | ButtonEventTypes.LongPress);
             _inputJoystick.DefaultButtonSettings.LongPressMinimumDurationMilliseconds = 1000;
             _inputJoystick.ButtonCallback = ButtonCallback;
             _inputJoystick.AxisCallback = AxisCallback;
 
             _features.Clear();
             _features.Add(new FullPassThru(_loggerFactory, _inputJoystick, _outputJoystick) { Enabled = false, ToggleButton = 6 });
-            // Single fire and Scaled axis both want to muck with axis - and are mutuall exclusive - so .. they use the same toggle, but 
+            // Single fire and Scaled axis both want to muck with axis - and are mutually exclusive - so .. they use the same toggle, but 
             //  different initial states.  We start with the single fire feature on, toggling that off will toggle the scaled axis ON.
             _features.Add(new SingleFireAxis(_loggerFactory, _inputJoystick, _outputJoystick) { Enabled = true, ToggleButton = 7 });
             _features.Add(new ScaledAxis(_loggerFactory, _inputJoystick, _outputJoystick) { Enabled = false, ToggleButton = 7 });
@@ -48,7 +49,7 @@ namespace XacAssist.JitM {
             foreach(Feature feature in _features) {
                 _logger.LogDebug($"Starting feature: {feature.Name} Enabled => {feature.Enabled} Toggle => {feature.ToggleButton}");
                 feature.Start();
-            }
+            }            
         }
 
         public void Tick() {
