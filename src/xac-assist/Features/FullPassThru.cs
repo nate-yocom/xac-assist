@@ -34,6 +34,7 @@ namespace XacAssist.Features {
         private Image<Bgr565> _passthroughEnabledImage = Image.Load<Bgr565>("data/images/background_passthrough_only.png");
 
         public override void TickFrame(Image frame) {
+            Dirty = false;
             frame.Mutate(f => {
                 if (Enabled) {
                     f.DrawImage(_passthroughEnabledImage, ENABLED_OVERLAY_POSITION, 1.0f);

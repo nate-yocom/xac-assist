@@ -59,8 +59,10 @@ namespace XacAssist.Features {
         private static readonly PointF DEFAULT_TEXT_LOCATION = new PointF(425.0f, 90.0f);
 
         public override void TickFrame(Image frame) {
+            Dirty = false;
+            
             // If we are enabled, we label MODE as scaled, and then include our hints for how to change the current scale
-            if (Enabled) {
+            if (Enabled) {                
                 frame.Mutate(f => {                    
                     f.DrawText($"SINGLE-FIRE AXIS", FontManager.GetFont(FontStyle.Bold), Color.Blue, DEFAULT_TEXT_LOCATION);
                 });

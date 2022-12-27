@@ -10,10 +10,22 @@ namespace XacAssist.Features {
     public abstract class Feature {
         protected Joystick? _inputJoystick;
         protected SimpleJoystick? _outputJoystick;
-        protected ILoggerFactory _loggerFactory;
+        protected ILoggerFactory _loggerFactory;        
+
+        private object _mutex = new object();
+        private bool _dirty = false;
+
+        public bool Dirty { 
+            get { lock (_mutex) { return _dirty; } } 
+            protected set { lock(_mutex) { _dirty = value; } }
+        }
 
         // Feature current toggled on or off
-        public bool Enabled { get; set; }
+        private bool _enabled = false;
+        public bool Enabled { 
+            get { lock(_mutex) { return _enabled; } } 
+            set { lock(_mutex) { _enabled = value; _dirty = true; } }
+        }
 
         // What button toggles this feature
         public int ToggleButton { get; set; }
@@ -38,7 +50,7 @@ namespace XacAssist.Features {
         
         public abstract void Stop();
 
-        public virtual void TickFrame(Image frame) {}
+        public virtual void TickFrame(Image frame) {}        
         
         // Button and Axis filters are only called if Enabled == True
         public abstract FeatureFilterAction ButtonFilter(ref byte buttonId, ButtonEventTypes eventType, ref bool pressed, TimeSpan elapsed);

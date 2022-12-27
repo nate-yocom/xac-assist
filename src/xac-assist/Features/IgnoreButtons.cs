@@ -30,6 +30,7 @@ namespace XacAssist.Features {
         private static readonly PointF DEFAULT_TEXT_LOCATION = new PointF(486.0f, 165.0f);
 
         public override void TickFrame(Image frame) {
+            Dirty = false;
             frame.Mutate(f => {
                 f.DrawText(Enabled ? "IGNORED" : "ENABLED", FontManager.GetFont(Enabled ? FontStyle.Regular : FontStyle.BoldItalic), Enabled ? Color.Red : Color.Green, DEFAULT_TEXT_LOCATION);
             });
