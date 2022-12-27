@@ -41,8 +41,9 @@ namespace XacAssist.Features {
         private Image<Bgr565> _scaleHintImage = Image.Load<Bgr565>("data/images/background_bottom.png");
 
         public override void TickFrame(Image frame) {
+            Dirty = false;
             // If we are enabled, we label MODE as scaled, and then include our hints for how to change the current scale
-            if (Enabled) {
+            if (Enabled) {                
                 frame.Mutate(f => {
                     f.DrawImage(_scaleHintImage, IMAGE_OVERLAY_POSITION, 1.0f);
                     f.DrawText($"SCALE AXIS BY {ScaleAmount.ToString("P0")}", FontManager.GetFont(FontStyle.Bold), Color.Blue, DEFAULT_TEXT_LOCATION);                    
@@ -56,9 +57,11 @@ namespace XacAssist.Features {
                 if (eventType == ButtonEventTypes.Press) {
                     if (buttonId == 10) {
                         ScaleAmount = Math.Max(0.05f, ScaleAmount - 0.05f);
+                        Dirty = true;
                         _logger.LogDebug($"Decremented scale amount to: {ScaleAmount}");
                     } else if (buttonId == 11) {
-                        ScaleAmount = Math.Min(1.0f, ScaleAmount + 0.05f);                        
+                        ScaleAmount = Math.Min(1.0f, ScaleAmount + 0.05f);
+                        Dirty = true;
                         _logger.LogDebug($"Incremented scale amount to: {ScaleAmount}");
                     }
                 }

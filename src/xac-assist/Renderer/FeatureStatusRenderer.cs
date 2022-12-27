@@ -69,24 +69,30 @@ namespace XacAssist.Renderer {
                     Feature passThrough = _features!.Where(f => f is FullPassThru).First();               
                     
                     while(!_cancellationTokenSource.Token.IsCancellationRequested) {
-                        // Clone the image
-                        using(Image<Bgr565> frame = image.Clone()) {                            
-                            // If passthrough is enabled, that is the only one that renders
-                            if (passThrough.Enabled) {
-                                passThrough.TickFrame(frame);
-                            } else {
-                                // Otherwise all features get a chance to render                                
-                                foreach(Feature feature in _features!) {
-                                    feature.TickFrame(frame);
-                                }
-                            }                            
+                        // Any work to do?
+                        if(_features!.Any(f => f.Dirty)) {                            
+                            // Clone the image
+                            using(Image<Bgr565> frame = image.Clone()) {                            
+                                // If passthrough is enabled, that is the only one that renders
+                                if (passThrough.Enabled) {
+                                    passThrough.TickFrame(frame);
+                                } else {
+                                    // Otherwise all features get a chance to render                                
+                                    foreach(Feature feature in _features!) {
+                                        feature.TickFrame(frame);
+                                    }
+                                }                            
 
-                            // Display the result
-                            frame.CopyPixelDataTo(pixelBytes);
-                            _frameBuffer.WriteRaw(pixelBytes);
-                        }
-                        // Loop after a bit'o'rest
-                        Thread.Sleep(100);
+                                // Display the result
+                                frame.CopyPixelDataTo(pixelBytes);
+                                _frameBuffer.WriteRaw(pixelBytes);
+                            }
+
+                            // Loop after a bit'o'rest
+                            Thread.Sleep(10);
+                        } else {
+                            Thread.Sleep(250);
+                        }                                                
                     }
                 }
             } catch(Exception ex) {
