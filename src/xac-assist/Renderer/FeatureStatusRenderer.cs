@@ -12,6 +12,8 @@ namespace XacAssist.Renderer {
 
     public class FeatureStatusRenderer {
         private const string DEFAULT_BACKGROUND_IMAGE = "data/images/background.png";        
+        private const string DEFAULT_LOAD_SCREEN_BY_SYDNEY_YOCOM = "data/images/slaythespireyeahhhwithsignature.png";
+        private const int LOAD_TIME_MILLISECONDS = 5000;
 
         private readonly IConfiguration _configuration;
         private readonly ILoggerFactory _loggerFactory;
@@ -32,7 +34,7 @@ namespace XacAssist.Renderer {
                 try {
                     _logger.LogTrace($"Attempting to use {frameBufferDevice} for framebuffer output");
                     _frameBuffer = new RawFrameBuffer(frameBufferDevice, _loggerFactory.CreateLogger(frameBufferDevice), true);                    
-                    _frameBuffer.Clear();
+                    _frameBuffer.Clear();                                        
                 } catch(Exception ex) {
                     _logger.LogError($"Unable to use {frameBufferDevice} for framebuffer output, proceeding without display => {ex.Message}");
                     _frameBuffer = null;
@@ -57,13 +59,21 @@ namespace XacAssist.Renderer {
                 // Re-use the same byte[] always, to avoid re-alloc overhead
                 byte[] pixelBytes = new byte[_frameBuffer.PixelWidth * _frameBuffer.PixelHeight * (_frameBuffer.PixelDepth / 8)];
 
+                if (File.Exists(DEFAULT_LOAD_SCREEN_BY_SYDNEY_YOCOM)) {
+                    using(Image<Bgr565> loadScreen = Image.Load<Bgr565>(DEFAULT_LOAD_SCREEN_BY_SYDNEY_YOCOM)) {
+                        loadScreen.CopyPixelDataTo(pixelBytes);
+                        _frameBuffer.WriteRaw(pixelBytes);
+                        Thread.Sleep(LOAD_TIME_MILLISECONDS);
+                    }
+                }
+
                 // Load a fresh copy of the background image
                 using(Image<Bgr565> image = Image.Load<Bgr565>(DEFAULT_BACKGROUND_IMAGE)) {
                     // Make sure it fits the screen    
                     image.Mutate(x =>
                     {
                         x.Resize(_frameBuffer.PixelWidth, _frameBuffer.PixelHeight);                        
-                    });     
+                    });
 
                     // Find and hold onto the Passthrough feature, so we can differentiate modes
                     Feature passThrough = _features!.Where(f => f is FullPassThru).First();               
