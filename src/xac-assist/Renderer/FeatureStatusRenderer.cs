@@ -62,8 +62,14 @@ namespace XacAssist.Renderer {
                 if (File.Exists(DEFAULT_LOAD_SCREEN_BY_SYDNEY_YOCOM)) {
                     using(Image<Bgr565> loadScreen = Image.Load<Bgr565>(DEFAULT_LOAD_SCREEN_BY_SYDNEY_YOCOM)) {
                         loadScreen.CopyPixelDataTo(pixelBytes);
-                        _frameBuffer.WriteRaw(pixelBytes);
-                        Thread.Sleep(LOAD_TIME_MILLISECONDS);
+
+                        // For the first LOAD_TIME_MILLISECONDS of time, we want to paint repeatedly, to overwrite the console
+                        //  that sometimes shows up.
+                        System.Diagnostics.Stopwatch timer = System.Diagnostics.Stopwatch.StartNew();
+                        while(timer.ElapsedMilliseconds < LOAD_TIME_MILLISECONDS) {                                            
+                            _frameBuffer.WriteRaw(pixelBytes);
+                            Thread.Sleep(10);
+                        }
                     }
                 }
 
