@@ -5,6 +5,7 @@ using XacAssist.Pipeline;
 using XacAssist.Features;
 
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace XacAssist.JitM {
 
@@ -17,6 +18,7 @@ namespace XacAssist.JitM {
         private Joystick? _inputJoystick;
         private SimpleJoystick? _outputJoystick;        
         private object _mutex = new object();
+        private Stopwatch _lastInputTimer = Stopwatch.StartNew();
 
 
         private List<Feature> _features = new List<Feature>();
@@ -52,6 +54,11 @@ namespace XacAssist.JitM {
             }            
         }
 
+        public Stopwatch TimeSinceLastInput()
+        {
+            return _lastInputTimer;
+        }
+
         public void Tick() {
             lock(_mutex) {
                 foreach(Feature feature in _features) {
@@ -81,6 +88,7 @@ namespace XacAssist.JitM {
 
         private void ButtonCallback(Joystick joystick, byte buttonId, ButtonEventTypes eventType, bool pressed, TimeSpan elapsed) {
             lock(_mutex) {
+                _lastInputTimer.Restart();
                 _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Button[{buttonId}]:{eventType} Pressed=>{pressed} [{elapsed}]");
 
                 // Long press button 0 means dump state
@@ -123,6 +131,7 @@ namespace XacAssist.JitM {
 
         private void AxisCallback(Joystick joystick, byte axisId, short value, TimeSpan elapsed) {
             lock(_mutex) {
+                _lastInputTimer.Restart();
                 _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Axis[{axisId}]:{value} [{elapsed}]");
 
                 bool swallowed = false;
@@ -145,6 +154,7 @@ namespace XacAssist.JitM {
         }
 
         private void ConnectedCallback(Joystick joystick, bool connected) {
+            _lastInputTimer.Restart();
             _logger.LogInformation($"{joystick.DeviceName} => Connected[{connected}]");
         }
     }

@@ -41,7 +41,7 @@ namespace XacAssist {
             _logger.LogInformation("ExecuteAsync() running"); 
 
             _pipeline.Start();            
-            _featureRenderer.Start(_pipeline.Features);
+            _featureRenderer.Start(_pipeline);
                 
             while (!stoppingToken.IsCancellationRequested && !_internalStopToken.Token.IsCancellationRequested) {
                 await Task.Delay(10, stoppingToken);
