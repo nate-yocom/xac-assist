@@ -3,9 +3,11 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 using Nfw.Linux.FrameBuffer;
 
+using XacAssist.Pipeline;
 using XacAssist.Features;
 
 namespace XacAssist.Renderer {
@@ -14,6 +16,7 @@ namespace XacAssist.Renderer {
         private const string DEFAULT_BACKGROUND_IMAGE = "data/images/background.png";        
         private const string DEFAULT_LOAD_SCREEN_BY_SYDNEY_YOCOM = "data/images/slaythespireyeahhhwithsignature.png";
         private const int LOAD_TIME_MILLISECONDS = 5000;
+        private const int BLANK_AFTER_INACTIVE_TIME_SECONDS = 10;
 
         private readonly IConfiguration _configuration;
         private readonly ILoggerFactory _loggerFactory;
@@ -22,6 +25,8 @@ namespace XacAssist.Renderer {
         private ReadOnlyCollection<Feature>? _features;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private Task? _tickTask;
+        private bool _blanked = false;
+        private IPipeline? _pipeline = null;
 
         public FeatureStatusRenderer(ILoggerFactory loggerFactory, IConfiguration configuration) {
             _loggerFactory = loggerFactory;
@@ -42,8 +47,9 @@ namespace XacAssist.Renderer {
             }            
         }
 
-        public void Start(ReadOnlyCollection<Feature> features) {
-            _features = features;            
+        public void Start(IPipeline pipeline) {
+            _features = pipeline.Features;
+            _pipeline = pipeline;
             _tickTask = Task.Factory.StartNew(() => Tick(), TaskCreationOptions.LongRunning);
         }
 
@@ -56,6 +62,9 @@ namespace XacAssist.Renderer {
             if (_frameBuffer == null) return;
             
             try {
+                // Just in case.
+                _frameBuffer.UnBlank();
+
                 // Re-use the same byte[] always, to avoid re-alloc overhead
                 byte[] pixelBytes = new byte[_frameBuffer.PixelWidth * _frameBuffer.PixelHeight * (_frameBuffer.PixelDepth / 8)];
 
@@ -73,6 +82,8 @@ namespace XacAssist.Renderer {
                     }
                 }
 
+                _pipeline?.TimeSinceLastInput().Restart();
+
                 // Load a fresh copy of the background image
                 using(Image<Bgr565> image = Image.Load<Bgr565>(DEFAULT_BACKGROUND_IMAGE)) {
                     // Make sure it fits the screen    
@@ -82,13 +93,23 @@ namespace XacAssist.Renderer {
                     });
 
                     // Find and hold onto the Passthrough feature, so we can differentiate modes
-                    Feature passThrough = _features!.Where(f => f is FullPassThru).First();               
-                    
+                    Feature passThrough = _features!.Where(f => f is FullPassThru).First();
+                                        
                     while(!_cancellationTokenSource.Token.IsCancellationRequested) {
+                        var forceUpdate = false;
+                        if (_blanked && _pipeline?.TimeSinceLastInput().Elapsed.TotalSeconds < BLANK_AFTER_INACTIVE_TIME_SECONDS)
+                        {
+                            _blanked = false;
+                            forceUpdate = true;
+                            _frameBuffer.UnBlank();
+                        }
+
                         // Any work to do?
-                        if(_features!.Any(f => f.Dirty)) {                            
+                        if(forceUpdate || _features!.Any(f => f.Dirty)) {
+                            forceUpdate = false;
+
                             // Clone the image
-                            using(Image<Bgr565> frame = image.Clone()) {                            
+                            using(Image<Bgr565> frame = image.Clone()) {                                
                                 // If passthrough is enabled, that is the only one that renders
                                 if (passThrough.Enabled) {
                                     passThrough.TickFrame(frame);
@@ -104,9 +125,15 @@ namespace XacAssist.Renderer {
                                 _frameBuffer.WriteRaw(pixelBytes);
                             }
 
-                            // Loop after a bit'o'rest
+                            // Loop after a bit'o'rest                            
                             Thread.Sleep(10);
-                        } else {
+                        } else {              
+                            // Has it been long enough to just blank?
+                            if (_pipeline?.TimeSinceLastInput().Elapsed.TotalSeconds >= BLANK_AFTER_INACTIVE_TIME_SECONDS)
+                            {
+                                _blanked = true;
+                                _frameBuffer.Blank();
+                            }
                             Thread.Sleep(250);
                         }                                                
                     }

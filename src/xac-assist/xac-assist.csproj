@@ -7,7 +7,7 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <PackageReference Include="Nfw.Linux.Framebuffer" Version="1.0.1" />
+    <PackageReference Include="Nfw.Linux.Framebuffer" Version="1.0.2" />
     <PackageReference Include="Nfw.Linux.Hid" Version="1.0.2" />
     <PackageReference Include="Nfw.Linux.Joystick" Version="1.0.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.3" />
