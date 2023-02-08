@@ -131,7 +131,7 @@ namespace XacAssist.JitM {
 
         private void AxisCallback(Joystick joystick, byte axisId, short value, TimeSpan elapsed) {
             lock(_mutex) {
-                _lastInputTimer.Restart();
+                //_lastInputTimer.Restart();
                 _logger.LogTrace($"{joystick.Device} [{joystick.DeviceName}] => Axis[{axisId}]:{value} [{elapsed}]");
 
                 bool swallowed = false;
